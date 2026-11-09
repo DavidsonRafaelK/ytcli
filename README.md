@@ -1,7 +1,7 @@
 # yt
 
 YouTube in the macOS terminal: your home feed as a thumbnail grid, search, and a watch
-page with the description, comments and related videos. Videos play in mpv.
+page with the description and comments. Videos play in mpv.
 
 ## Requirements
 
@@ -43,6 +43,13 @@ stays long.
 | :---------- | :------------------------------------------------------------------------ |
 | Home        | arrows/`hjkl` move, `⏎` play, `tab` next feed, `/` search, `r` refresh     |
 | Watch page  | `↑↓` move, `⏎` expand description/replies, `p` play again, `esc` back     |
-| Up next     | `→`/`tab` go there, `↑↓` choose, `⏎` play, `←` back to the details        |
 | Search bar  | `⏎` search, `esc` cancel, `^U` clear, `^W` delete word                    |
 | Anywhere    | `L` account, `q` quit                                                     |
+
+## License
+
+Copyright (C) 2026 Davidson Rafael
+
+This program is free software: you can redistribute it and/or modify it under the terms
+of the GNU General Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version. See [LICENSE](LICENSE).

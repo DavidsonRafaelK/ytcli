@@ -3,6 +3,8 @@ name = "yt"
 version = "0.1.0"
 edition = "2024"
 description = "YouTube in the macOS terminal"
+authors = ["Davidson Rafael"]
+license = "GPL-3.0-or-later"
 rust-version = "1.85"
 
 [dependencies]
