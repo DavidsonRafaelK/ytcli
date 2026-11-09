@@ -1,0 +1,36 @@
+[package]
+name = "yt"
+version = "0.1.0"
+edition = "2024"
+description = "YouTube in the macOS terminal"
+rust-version = "1.85"
+
+[dependencies]
+image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
+ratatui = "0.30.2"
+ratatui-image = { version = "11.1.0", default-features = false, features = ["crossterm"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+textwrap = "0.16.4"
+unicode-width = "0.2.3"
+# Security.framework does TLS with the system trust store; no bundled crypto or CA list.
+ureq = { version = "3.5.1", default-features = false, features = ["native-tls-no-default"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[lints.rust]
+# Allowed only in `videotoolbox`, the one FFI call into macOS.
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+todo = "deny"
+unimplemented = "deny"
