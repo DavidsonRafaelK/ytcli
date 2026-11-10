@@ -6,6 +6,9 @@ use crate::model::VideoCard;
 /// state; anything with side effects (processes, network, other screens) goes through here.
 pub enum Intent {
     Open(VideoCard),
+    /// Adds the video to the queue, or takes it out again.
+    ToggleQueue(VideoCard),
+    ToggleAutoplay,
     Replay,
     Back,
     FocusSearch,

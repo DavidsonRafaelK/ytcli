@@ -14,6 +14,11 @@ pub const fn bold() -> Style {
     Style::new().add_modifier(Modifier::BOLD)
 }
 
+/// Labels such as "Queued" that stand out without looking like an error.
+pub const fn highlight() -> Style {
+    Style::new().fg(FOCUS).add_modifier(Modifier::BOLD)
+}
+
 pub const fn accent() -> Style {
     Style::new().fg(ACCENT)
 }

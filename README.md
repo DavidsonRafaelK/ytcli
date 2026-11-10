@@ -32,6 +32,12 @@ Videos play at up to 1080p in the best codec this Mac decodes in hardware, as re
 VideoToolbox: AV1 on M3 and later, VP9 otherwise. CPU use stays low and battery life
 stays long.
 
+## Queue and autoplay
+
+Press `a` on a video to queue it; queued videos head the "Up next" column. When a video
+ends, the queue plays first, then with autoplay on the first related video you have not
+watched yet. The next one loads into the same mpv window. `A` turns autoplay on or off.
+
 ## Files
 
 - Settings: `~/Library/Application Support/yt/config`
@@ -41,8 +47,9 @@ stays long.
 
 | Where       | Keys                                                                      |
 | :---------- | :------------------------------------------------------------------------ |
-| Home        | arrows/`hjkl` move, `⏎` play, `tab` next feed, `/` search, `r` refresh     |
-| Watch page  | `↑↓` move, `⏎` expand description/replies, `p` play again, `esc` back     |
+| Home        | arrows/`hjkl` move, `⏎` play, `a` queue, `tab` next feed, `/` search, `r` refresh |
+| Watch page  | `↑↓` move, `⏎` expand description/replies, `p` play again, `A` autoplay, `esc` back |
+| Up next     | `→`/`tab` go there, `↑↓` choose, `⏎` play, `a` queue, `←` back to the details |
 | Search bar  | `⏎` search, `esc` cancel, `^U` clear, `^W` delete word                    |
 | Anywhere    | `L` account, `q` quit                                                     |
 

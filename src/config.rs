@@ -4,23 +4,37 @@ use std::{env, fs, io};
 use crate::browser::{self, Browser};
 
 /// Settings that survive restarts, stored as `key=value` lines.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Config {
     /// The browser whose Google session is used. `None` means signed out.
     pub browser: Option<&'static Browser>,
+    /// Whether a related video plays when one ends and the queue is empty.
+    pub autoplay: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            browser: None,
+            autoplay: true,
+        }
+    }
 }
 
 impl Config {
     pub fn load() -> Self {
+        let mut config = Self::default();
         let Ok(text) = fs::read_to_string(config_file()) else {
-            return Self::default();
+            return config;
         };
-        let browser = text
-            .lines()
-            .filter_map(|line| line.split_once('='))
-            .find(|(key, _)| key.trim() == "browser")
-            .and_then(|(_, value)| browser::find(value.trim()));
-        Self { browser }
+        for (key, value) in text.lines().filter_map(|line| line.split_once('=')) {
+            match key.trim() {
+                "browser" => config.browser = browser::find(value.trim()),
+                "autoplay" => config.autoplay = value.trim() != "off",
+                _ => {}
+            }
+        }
+        config
     }
 
     pub fn save(&self) -> io::Result<()> {
@@ -28,10 +42,13 @@ impl Config {
         if let Some(dir) = path.parent() {
             fs::create_dir_all(dir)?;
         }
-        let body = self
-            .browser
-            .map(|browser| format!("browser={}\n", browser.id))
-            .unwrap_or_default();
+        let mut body = String::new();
+        if let Some(browser) = self.browser {
+            body.push_str(&format!("browser={}\n", browser.id));
+        }
+        if !self.autoplay {
+            body.push_str("autoplay=off\n");
+        }
         fs::write(path, body)
     }
 }

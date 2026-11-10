@@ -86,6 +86,13 @@ impl Home {
             KeyCode::Home | KeyCode::Char('g') => self.selected = 0,
             KeyCode::End | KeyCode::Char('G') => self.select(usize::MAX),
             KeyCode::Enter => return self.cards.get(self.selected).cloned().map(Intent::Open),
+            KeyCode::Char('a') => {
+                return self
+                    .cards
+                    .get(self.selected)
+                    .cloned()
+                    .map(Intent::ToggleQueue);
+            }
             KeyCode::Tab => return Some(Intent::SwitchFeed(self.feed.cycle(1))),
             KeyCode::BackTab => return Some(Intent::SwitchFeed(self.feed.cycle(-1))),
             KeyCode::Esc if matches!(self.feed, Feed::Search(_)) => {

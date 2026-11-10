@@ -1,7 +1,7 @@
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::style::{Color, Style};
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Paragraph};
 use ratatui_image::Image;
 use ratatui_image::protocol::Protocol;
@@ -10,12 +10,14 @@ use super::{text, theme};
 use crate::format;
 use crate::model::VideoCard;
 
-/// One video in the grid: thumbnail with its duration badge, then title, channel and views.
+/// One video in the grid: thumbnail with its duration badge, then title, channel and
+/// views, led by `label` such as "Queued".
 pub fn render(
     frame: &mut Frame,
     area: Rect,
     card: &VideoCard,
     selected: bool,
+    label: Option<&'static str>,
     thumbnail: Option<&Protocol>,
     thumbnail_height: u16,
 ) {
@@ -51,10 +53,21 @@ pub fn render(
         text::ellipsize(&card.channel, width),
         theme::muted(),
     ));
-    if let Some(views) = card.views {
-        lines.push(Line::styled(format::views(views), theme::muted()));
-    }
+    lines.extend(meta_line(card.views, label));
     frame.render_widget(Paragraph::new(lines), info);
+}
+
+/// The views line, led by a highlighted `label`.
+pub fn meta_line(views: Option<u64>, label: Option<&'static str>) -> Option<Line<'static>> {
+    let views = views.map(format::views);
+    let Some(label) = label else {
+        return views.map(|views| Line::styled(views, theme::muted()));
+    };
+    let mut spans = vec![Span::styled(label, theme::highlight())];
+    if let Some(views) = views {
+        spans.push(Span::styled(format!(" · {views}"), theme::muted()));
+    }
+    Some(Line::from(spans))
 }
 
 /// Text drawn over the picture's bottom-right corner, hiding the image cells under it.

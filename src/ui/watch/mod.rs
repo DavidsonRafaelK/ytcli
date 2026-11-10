@@ -8,23 +8,18 @@ use std::ops::Range;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
-use ratatui_image::FontSize;
 
-use crate::app::{Column, Thumbnails, Watch};
+use crate::app::{App, Column, Watch};
 use crate::layout::WatchColumns;
 use page::Page;
 
-pub fn render(
-    frame: &mut Frame,
-    area: Rect,
-    watch: &mut Watch,
-    thumbnails: &Thumbnails,
-    font: FontSize,
-) {
-    let columns = WatchColumns::new(area, font);
-    render_page(frame, columns.page, watch);
-    if let Some(up_next) = &columns.up_next {
-        up_next::render(frame, up_next, watch, thumbnails);
+pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
+    let columns = WatchColumns::new(area, app.font);
+    if let (Some(up_next), Some(watch)) = (&columns.up_next, &app.watch) {
+        up_next::render(frame, up_next, app, watch);
+    }
+    if let Some(watch) = app.watch.as_mut() {
+        render_page(frame, columns.page, watch);
     }
 }
 

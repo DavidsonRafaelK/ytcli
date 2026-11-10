@@ -12,12 +12,14 @@ use crate::browser::Browser;
 use crate::error::Result;
 use crate::feed::Feed;
 use crate::model::{Thread, VideoCard, VideoDetails};
+use crate::player::PlayerEvent;
 use crate::{thumbnail, ytdlp};
 
 /// Everything the UI thread waits for: input, and results coming back from background work.
 pub enum Msg {
     /// A key press or a resize; nothing else ever needs a redraw.
     Input(io::Result<Event>),
+    Player(PlayerEvent),
     Feed {
         generation: u64,
         result: Result<Vec<VideoCard>>,
@@ -81,6 +83,11 @@ impl Worker {
             },
             inbox,
         )
+    }
+
+    /// Where results go, for others that report back to the UI thread.
+    pub fn sender(&self) -> Sender<Msg> {
+        self.results.clone()
     }
 
     pub fn feed(

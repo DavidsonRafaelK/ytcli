@@ -31,13 +31,17 @@ fn hints(app: &App) -> &'static str {
         return " ⏎ search  esc cancel  ^U clear";
     }
     match app.screen {
-        Screen::Home => " ←↑↓→ move  ⏎ play  tab feeds  / search  r refresh  L account  q quit",
+        Screen::Home => {
+            " ←↑↓→ move  ⏎ play  a queue  tab feeds  / search  r refresh  L account  q quit"
+        }
         Screen::Watch => match app.watch.as_ref().map(|watch| watch.column) {
-            Some(Column::UpNext) => " ↑↓ move  ⏎ play  ← details  p play again  esc back  q quit",
-            _ if app.up_next().is_some() => {
-                " ↑↓ move  ⏎ expand  → up next  p play again  / search  esc back  q quit"
+            Some(Column::UpNext) => {
+                " ↑↓ move  ⏎ play  a queue  ← details  A autoplay  p play again  esc back  q quit"
             }
-            _ => " ↑↓ move  ⏎ expand  p play again  / search  esc back  q quit",
+            _ if app.up_next().is_some() => {
+                " ↑↓ move  ⏎ expand  → up next  A autoplay  p play again  / search  esc back  q quit"
+            }
+            _ => " ↑↓ move  ⏎ expand  A autoplay  p play again  / search  esc back  q quit",
         },
         Screen::Login => " ↑↓ choose  o open sign-in page  ⏎ use browser  esc skip",
     }

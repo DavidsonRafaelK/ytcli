@@ -23,9 +23,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             grid::render(frame, areas.body, app);
         }
         Screen::Watch => {
-            if let Some(watch) = app.watch.as_mut() {
-                watch::render(frame, areas.body, watch, &app.thumbnails, app.font);
-            }
+            watch::render(frame, areas.body, app);
         }
         Screen::Login => login::render(frame, areas.body, &app.login, app.config.browser),
     }

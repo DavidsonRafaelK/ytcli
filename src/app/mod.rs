@@ -12,6 +12,8 @@ pub use search::SearchBar;
 pub use thumbnails::Thumbnails;
 pub use watch::{Column, Loadable, Watch};
 
+use std::collections::HashSet;
+
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Rect, Size};
 use ratatui_image::FontSize;
@@ -20,7 +22,7 @@ use crate::config::Config;
 use crate::feed::Feed;
 use crate::layout::{Areas, Grid, UpNext, WatchColumns};
 use crate::model::VideoCard;
-use crate::player::Player;
+use crate::player::{Outcome, Player};
 use crate::worker::{Msg, Worker};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -41,6 +43,10 @@ pub struct App {
     pub status: Option<Box<str>>,
     pub font: FontSize,
     pub quit: bool,
+    /// Videos to play next, in order, before autoplay picks a related one.
+    pub queue: Vec<VideoCard>,
+    /// Videos started this session; autoplay skips them so it cannot go back and forth.
+    played: HashSet<Box<str>>,
     /// Where Esc on the login screen returns to.
     back_to: Screen,
     terminal: Size,
@@ -62,9 +68,11 @@ impl App {
             status: None,
             font,
             quit: false,
+            queue: Vec::new(),
+            played: HashSet::new(),
             back_to: Screen::Home,
             terminal,
-            player: Player::default(),
+            player: Player::new(worker.sender()),
             worker,
         };
         if app.config.browser.is_none() {
@@ -111,9 +119,10 @@ impl App {
                 }
                 Screen::Watch => {
                     let rows = self.up_next().map(|up_next| up_next.rows());
+                    let cards: Vec<VideoCard> = self.up_next_cards().into_iter().cloned().collect();
                     self.watch
                         .as_mut()
-                        .and_then(|watch| watch.on_key(key, rows))
+                        .and_then(|watch| watch.on_key(key, rows, &cards))
                 }
                 Screen::Login => {
                     let signed_in = self.config.browser.is_some();
@@ -130,6 +139,11 @@ impl App {
         match msg {
             // The main loop handles input itself, since a broken terminal ends the app.
             Msg::Input(_) => {}
+            Msg::Player(event) => match self.player.on_event(event) {
+                Some(Outcome::Finished) => self.play_next(),
+                Some(Outcome::Failed(err)) => self.status = Some(format!("mpv: {err}").into()),
+                None => {}
+            },
             Msg::Feed { generation, result } => self.home.receive(generation, result),
             Msg::Video { id, result } => {
                 if let Some(watch) = self.watching(&id) {
@@ -149,6 +163,8 @@ impl App {
             Msg::Thumbnail { id, size, result } => self.thumbnails.receive(id, size, result),
             Msg::Verified { browser, result } => match result {
                 Ok(()) => {
+                    // mpv was started with the old session's cookies.
+                    self.player.stop();
                     self.config.browser = Some(browser);
                     self.save_config();
                     self.login.state = LoginState::Idle;
@@ -160,34 +176,73 @@ impl App {
         }
     }
 
+    /// What the "Up next" column lists: the queue, then related videos not already in it.
+    pub fn up_next_cards(&self) -> Vec<&VideoCard> {
+        let Some(watch) = &self.watch else {
+            return Vec::new();
+        };
+        let related = watch.related.ready().map_or(&[][..], Vec::as_slice);
+        let unqueued = related.iter().filter(|card| !self.is_queued(&card.id));
+        self.queue.iter().chain(unqueued).collect()
+    }
+
+    pub fn is_queued(&self, id: &str) -> bool {
+        self.queue.iter().any(|card| &*card.id == id)
+    }
+
+    /// The video that plays when this one ends: the queue first, then with autoplay the
+    /// first related video not played yet.
+    pub fn next_up(&self) -> Option<&VideoCard> {
+        if let Some(card) = self.queue.first() {
+            return Some(card);
+        }
+        if !self.config.autoplay {
+            return None;
+        }
+        let related = self.watch.as_ref()?.related.ready()?;
+        related.iter().find(|card| !self.played.contains(&card.id))
+    }
+
     /// Queues thumbnails for the cards on screen: the grid at home, "Up next" when watching.
     pub fn request_thumbnails(&mut self) {
-        let (cards, first, count, size) = match (self.screen, &self.watch) {
+        let (ids, size): (Vec<Box<str>>, Size) = match (self.screen, &self.watch) {
             (Screen::Home, _) => {
                 let grid = self.grid();
                 let first = self.home.top_row * grid.columns;
-                (&self.home.cards, first, grid.drawn(), grid.thumbnail)
+                let shown = self.home.cards.iter().skip(first).take(grid.drawn());
+                (shown.map(|card| card.id.clone()).collect(), grid.thumbnail)
             }
             (Screen::Watch, Some(watch)) => {
-                let (Some(cards), Some(up_next)) = (watch.related.ready(), self.up_next()) else {
+                let Some(up_next) = self.up_next() else {
                     return;
                 };
-                (cards, watch.related_top, up_next.drawn(), up_next.thumbnail)
+                let cards = self.up_next_cards().into_iter();
+                let shown = cards.skip(watch.up_next_top).take(up_next.drawn());
+                (
+                    shown.map(|card| card.id.clone()).collect(),
+                    up_next.thumbnail,
+                )
             }
             _ => return,
         };
-        let wanted = cards.iter().skip(first).take(count);
-        for card in wanted.clone() {
-            if self.thumbnails.claim(&card.id, size) {
-                self.worker.thumbnail(card.id.clone(), size);
+        for id in &ids {
+            if self.thumbnails.claim(id, size) {
+                self.worker.thumbnail(id.clone(), size);
             }
         }
-        self.thumbnails.trim(wanted.map(|card| &*card.id));
+        self.thumbnails.trim(ids.iter().map(|id| &**id));
     }
 
     fn apply(&mut self, intent: Intent) {
         match intent {
             Intent::Open(card) => self.open(card),
+            Intent::ToggleQueue(card) => self.toggle_queue(&card),
+            Intent::ToggleAutoplay => {
+                self.config.autoplay = !self.config.autoplay;
+                self.save_config();
+                let state = if self.config.autoplay { "on" } else { "off" };
+                self.status = Some(format!("Autoplay {state}").into());
+            }
             Intent::Replay => {
                 if let Some(id) = self.watch.as_ref().map(|watch| watch.card.id.clone()) {
                     self.play(&id);
@@ -241,7 +296,41 @@ impl App {
         self.watch.as_mut().filter(|watch| &*watch.card.id == id)
     }
 
+    fn toggle_queue(&mut self, card: &VideoCard) {
+        if self.is_queued(&card.id) {
+            self.queue.retain(|queued| queued.id != card.id);
+            self.status = Some("Removed from queue".into());
+        } else {
+            self.queue.push(card.clone());
+            self.status = Some(format!("Added to queue ({})", self.queue.len()).into());
+        }
+        // The list just reordered; keep "Up next" on the same video.
+        let position = self.up_next_cards().iter().position(|up| up.id == card.id);
+        let rows = self.up_next().map(|up_next| up_next.rows());
+        if let (Screen::Watch, Some(watch), Some(position), Some(rows)) =
+            (self.screen, self.watch.as_mut(), position, rows)
+        {
+            watch.up_next_selected = position;
+            watch.scroll_up_next(rows);
+        }
+    }
+
+    /// Called when a video played to its end.
+    fn play_next(&mut self) {
+        let Some(next) = self.next_up().cloned() else {
+            return;
+        };
+        let screen = self.screen;
+        self.open(next);
+        // Like youtube.com the watch page follows along, but browsing elsewhere goes on.
+        if screen != Screen::Watch {
+            self.screen = screen;
+        }
+    }
+
     fn open(&mut self, card: VideoCard) {
+        self.queue.retain(|queued| queued.id != card.id);
+        self.played.insert(card.id.clone());
         self.play(&card.id);
         self.worker.video(card.id.clone(), self.config.browser);
         self.worker.comments(card.id.clone(), self.config.browser);

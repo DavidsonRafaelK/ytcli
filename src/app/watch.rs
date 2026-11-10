@@ -38,18 +38,19 @@ pub enum Column {
     UpNext,
 }
 
-/// The page under the video: info, description and comments, with related videos ("Up
-/// next") beside it. The focusable items of the page are the description (0) and then each
-/// comment thread.
+/// The page under the video: info, description and comments, with "Up next" beside it:
+/// the queue, then related videos. The focusable items of the page are the description (0)
+/// and then each comment thread.
 pub struct Watch {
     pub card: VideoCard,
     pub details: Loadable<VideoDetails>,
     pub comments: Loadable<Vec<Thread>>,
     pub related: Loadable<Vec<VideoCard>>,
     pub column: Column,
-    /// Selected video of "Up next", and the first one on screen.
-    pub related_selected: usize,
-    pub related_top: usize,
+    /// Selected video of "Up next", and the first one on screen; both index the queue
+    /// followed by the related videos.
+    pub up_next_selected: usize,
+    pub up_next_top: usize,
     pub focus: usize,
     pub description_open: bool,
     pub open_threads: Vec<bool>,
@@ -67,8 +68,8 @@ impl Watch {
             comments: Loadable::Loading,
             related: Loadable::Loading,
             column: Column::Page,
-            related_selected: 0,
-            related_top: 0,
+            up_next_selected: 0,
+            up_next_top: 0,
             focus: 0,
             description_open: false,
             open_threads: Vec::new(),
@@ -93,11 +94,17 @@ impl Watch {
         self.related = Loadable::from_result(cards);
     }
 
-    /// `up_next_rows` is how many related videos fit on screen, `None` when the terminal
-    /// is too narrow to show them.
-    pub fn on_key(&mut self, key: KeyEvent, up_next_rows: Option<usize>) -> Option<Intent> {
+    /// `up_next` is what the "Up next" column lists, and `up_next_rows` how many of them
+    /// fit on screen, `None` when the terminal is too narrow to show the column.
+    pub fn on_key(
+        &mut self,
+        key: KeyEvent,
+        up_next_rows: Option<usize>,
+        up_next: &[VideoCard],
+    ) -> Option<Intent> {
         match key.code {
             KeyCode::Char('p') => return Some(Intent::Replay),
+            KeyCode::Char('A') => return Some(Intent::ToggleAutoplay),
             KeyCode::Char('/' | 's') => return Some(Intent::FocusSearch),
             KeyCode::Char('L') => return Some(Intent::ShowLogin),
             KeyCode::Char('q') => return Some(Intent::Quit),
@@ -105,7 +112,7 @@ impl Watch {
             _ => {}
         }
         match up_next_rows {
-            Some(rows) if self.column == Column::UpNext => self.on_up_next_key(key, rows),
+            Some(rows) if self.column == Column::UpNext => self.on_up_next_key(key, rows, up_next),
             Some(_) if matches!(key.code, KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab) => {
                 self.column = Column::UpNext;
                 None
@@ -117,15 +124,15 @@ impl Watch {
         }
     }
 
-    /// Keeps the selected related video on screen after the terminal changed size.
+    /// Keeps the selected "Up next" video on screen, e.g. after the terminal changed size.
     pub fn scroll_up_next(&mut self, rows: usize) {
-        let selected = self.related_selected;
-        self.related_top = if selected < self.related_top {
+        let selected = self.up_next_selected;
+        self.up_next_top = if selected < self.up_next_top {
             selected
-        } else if selected >= self.related_top + rows {
+        } else if selected >= self.up_next_top + rows {
             selected + 1 - rows
         } else {
-            self.related_top
+            self.up_next_top
         };
     }
 
@@ -143,23 +150,29 @@ impl Watch {
         None
     }
 
-    fn on_up_next_key(&mut self, key: KeyEvent, rows: usize) -> Option<Intent> {
-        let cards = self.related.ready().map_or(&[][..], Vec::as_slice);
+    fn on_up_next_key(
+        &mut self,
+        key: KeyEvent,
+        rows: usize,
+        cards: &[VideoCard],
+    ) -> Option<Intent> {
         let last = cards.len().saturating_sub(1);
+        let selected = cards.get(self.up_next_selected).cloned();
         match key.code {
-            KeyCode::Down | KeyCode::Char('j') => self.related_selected += 1,
+            KeyCode::Down | KeyCode::Char('j') => self.up_next_selected += 1,
             KeyCode::Up | KeyCode::Char('k') => {
-                self.related_selected = self.related_selected.saturating_sub(1);
+                self.up_next_selected = self.up_next_selected.saturating_sub(1);
             }
-            KeyCode::PageDown => self.related_selected += rows,
-            KeyCode::PageUp => self.related_selected = self.related_selected.saturating_sub(rows),
-            KeyCode::Home | KeyCode::Char('g') => self.related_selected = 0,
-            KeyCode::End | KeyCode::Char('G') => self.related_selected = last,
-            KeyCode::Enter => return cards.get(self.related_selected).cloned().map(Intent::Open),
+            KeyCode::PageDown => self.up_next_selected += rows,
+            KeyCode::PageUp => self.up_next_selected = self.up_next_selected.saturating_sub(rows),
+            KeyCode::Home | KeyCode::Char('g') => self.up_next_selected = 0,
+            KeyCode::End | KeyCode::Char('G') => self.up_next_selected = last,
+            KeyCode::Enter => return selected.map(Intent::Open),
+            KeyCode::Char('a') => return selected.map(Intent::ToggleQueue),
             KeyCode::Left | KeyCode::Char('h') | KeyCode::Tab => self.column = Column::Page,
             _ => {}
         }
-        self.related_selected = self.related_selected.min(last);
+        self.up_next_selected = self.up_next_selected.min(last);
         self.scroll_up_next(rows);
         None
     }

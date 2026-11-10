@@ -28,6 +28,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             grid.card(slot),
             video,
             index == home.selected,
+            app.is_queued(&video.id).then_some("Queued"),
             app.thumbnails.get(&video.id),
             grid.thumbnail.height,
         );
