@@ -62,6 +62,11 @@ pub fn cards(json: &[u8]) -> Result<Vec<VideoCard>> {
         .collect())
 }
 
+/// One line of a playlist listed entry by entry; `None` for anything but a video.
+pub fn card(json: &str) -> Option<VideoCard> {
+    serde_json::from_str::<RawEntry>(json).ok()?.into_card()
+}
+
 pub fn video(json: &[u8]) -> Result<VideoDetails> {
     let raw: RawVideo = serde_json::from_slice(json)?;
     Ok(VideoDetails {
@@ -146,6 +151,15 @@ mod tests {
         let cards = cards(json).unwrap_or_default();
         assert_eq!(cards.len(), 1);
         assert_eq!(cards.first().map(|c| c.duration), Some(Some(61)));
+    }
+
+    #[test]
+    fn reads_single_entries() {
+        let video = r#"{"id":"DhsrNWUwb80","title":"A","uploader":"U","duration":null}"#;
+        let channel = card(video).map(|card| card.channel);
+        assert_eq!(channel.as_deref(), Some("U"));
+        assert!(card(r#"{"id":"UC-w4KNTbWQCY8ciFGeHn5XQ","title":"A channel"}"#).is_none());
+        assert!(card("not json").is_none());
     }
 
     #[test]

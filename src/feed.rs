@@ -43,15 +43,18 @@ impl Feed {
     }
 
     /// What to hand yt-dlp. Searches are fixed-size playlists in yt-dlp, so they need to
-    /// know how far the caller intends to read.
-    pub fn source(&self, last: usize) -> String {
+    /// know how far the caller intends to read; `None` when that is open-ended.
+    pub fn source(&self, last: Option<usize>) -> String {
         match self {
             Self::Home => ":ytrec".into(),
             Self::Subscriptions => ":ytsubs".into(),
             Self::History => ":ythis".into(),
             Self::WatchLater => ":ytwatchlater".into(),
             Self::Liked => "https://www.youtube.com/playlist?list=LL".into(),
-            Self::Search(query) => format!("ytsearch{last}:{query}"),
+            Self::Search(query) => match last {
+                Some(last) => format!("ytsearch{last}:{query}"),
+                None => format!("ytsearchall:{query}"),
+            },
         }
     }
 }

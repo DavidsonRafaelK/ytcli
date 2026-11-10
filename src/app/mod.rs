@@ -204,30 +204,38 @@ impl App {
     }
 
     /// Queues thumbnails for the cards on screen: the grid at home, "Up next" when watching.
+    /// They are followed by as many of the cards after them, so scrolling on finds its
+    /// thumbnails already there.
     pub fn request_thumbnails(&mut self) {
-        let (ids, size): (Vec<Box<str>>, Size) = match (self.screen, &self.watch) {
+        let (ids, on_screen, size): (Vec<Box<str>>, usize, Size) = match (self.screen, &self.watch)
+        {
             (Screen::Home, _) => {
                 let grid = self.grid();
                 let first = self.home.top_row * grid.columns;
-                let shown = self.home.cards.iter().skip(first).take(grid.drawn());
-                (shown.map(|card| card.id.clone()).collect(), grid.thumbnail)
+                let wanted = self.home.cards.iter().skip(first).take(grid.drawn() * 2);
+                (
+                    wanted.map(|card| card.id.clone()).collect(),
+                    grid.drawn(),
+                    grid.thumbnail,
+                )
             }
             (Screen::Watch, Some(watch)) => {
                 let Some(up_next) = self.up_next() else {
                     return;
                 };
                 let cards = self.up_next_cards().into_iter();
-                let shown = cards.skip(watch.up_next_top).take(up_next.drawn());
+                let wanted = cards.skip(watch.up_next_top).take(up_next.drawn() * 2);
                 (
-                    shown.map(|card| card.id.clone()).collect(),
+                    wanted.map(|card| card.id.clone()).collect(),
+                    up_next.drawn(),
                     up_next.thumbnail,
                 )
             }
             _ => return,
         };
-        for id in &ids {
+        for (slot, id) in ids.iter().enumerate() {
             if self.thumbnails.claim(id, size) {
-                self.worker.thumbnail(id.clone(), size);
+                self.worker.thumbnail(id.clone(), size, slot < on_screen);
             }
         }
         self.thumbnails.trim(ids.iter().map(|id| &**id));
@@ -353,8 +361,16 @@ impl App {
 
     fn load_feed(&mut self, feed: Feed) {
         self.thumbnails.clear();
+        self.worker.forget_thumbnails();
         let signed_out = feed.needs_login() && self.config.account.is_none();
         self.home.reset(feed);
+        // Also ends the yt-dlp of the feed shown until now.
+        self.worker.open_feed(
+            self.home.generation(),
+            self.home.feed.clone(),
+            home::PAGE_SIZE,
+            self.config.account.clone(),
+        );
         if signed_out {
             self.home
                 .fail("Sign in to see this feed. Press L, or / to search.");
@@ -364,14 +380,8 @@ impl App {
     }
 
     fn load_more(&mut self) {
-        if let Some((generation, first)) = self.home.next_page() {
-            self.worker.feed(
-                generation,
-                self.home.feed.clone(),
-                first,
-                home::PAGE_SIZE,
-                self.config.account.clone(),
-            );
+        if self.home.next_page() {
+            self.worker.feed_page();
         }
     }
 

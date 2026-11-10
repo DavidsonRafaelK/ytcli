@@ -44,13 +44,18 @@ impl Home {
         };
     }
 
-    /// Claims the next page for loading: `(generation, first position)`.
-    pub fn next_page(&mut self) -> Option<(u64, usize)> {
+    /// Tells the pages of this feed from those of one we already left.
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// Claims the next page for loading, unless one is on its way or none is left.
+    pub fn next_page(&mut self) -> bool {
         if self.loading || self.exhausted || self.error.is_some() {
-            return None;
+            return false;
         }
         self.loading = true;
-        Some((self.generation, self.cards.len() + 1))
+        true
     }
 
     pub fn receive(&mut self, generation: u64, page: Result<Vec<VideoCard>>) {

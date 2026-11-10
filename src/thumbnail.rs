@@ -19,6 +19,9 @@ use crate::error::{Error, Result};
 /// Thumbnails are about 15 KiB, so this keeps a few thousand.
 const MAX_CACHE_BYTES: u64 = 64 * 1024 * 1024;
 
+/// A thumbnail that takes longer than this is on a stalled connection.
+const TIMEOUT: Duration = Duration::from_secs(5);
+
 /// Shared by all downloads so thumbnails reuse open connections instead of shaking hands
 /// again; TLS goes through macOS's Security framework and the system trust store.
 static AGENT: LazyLock<Agent> = LazyLock::new(|| {
@@ -29,7 +32,7 @@ static AGENT: LazyLock<Agent> = LazyLock::new(|| {
     Agent::config_builder()
         .tls_config(tls)
         .https_only(true)
-        .timeout_global(Some(Duration::from_secs(15)))
+        .timeout_global(Some(TIMEOUT))
         .build()
         .new_agent()
 });
@@ -82,11 +85,17 @@ fn load(id: &str) -> Result<DynamicImage> {
 /// `mqdefault` is exactly 16:9, unlike the bigger sizes which are letterboxed 4:3.
 fn download(id: &str) -> Result<Vec<u8>> {
     let url = format!("https://i.ytimg.com/vi/{id}/mqdefault.jpg");
-    let mut response = AGENT.get(&url).call().map_err(Error::from_display)?;
-    response
-        .body_mut()
-        .read_to_vec()
-        .map_err(Error::from_display)
+    match fetch(&url) {
+        // The CDN's answer is final; anything else was the connection, and a new one
+        // usually works right away.
+        Err(err) if !matches!(err, ureq::Error::StatusCode(_)) => fetch(&url),
+        result => result,
+    }
+    .map_err(Error::from_display)
+}
+
+fn fetch(url: &str) -> std::result::Result<Vec<u8>, ureq::Error> {
+    AGENT.get(url).call()?.body_mut().read_to_vec()
 }
 
 /// Writes through a temporary file so a crash never leaves a truncated image behind.
