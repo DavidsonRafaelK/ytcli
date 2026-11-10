@@ -62,7 +62,7 @@ impl App {
             home: Home::new(),
             watch: None,
             search: SearchBar::default(),
-            login: Login::new(config.browser),
+            login: Login::new(config.account.as_ref()),
             thumbnails: Thumbnails::default(),
             config,
             status: None,
@@ -75,7 +75,7 @@ impl App {
             player: Player::new(worker.sender()),
             worker,
         };
-        if app.config.browser.is_none() {
+        if app.config.account.is_none() {
             app.screen = Screen::Login;
         }
         app.load_feed(Feed::Home);
@@ -125,7 +125,7 @@ impl App {
                         .and_then(|watch| watch.on_key(key, rows, &cards))
                 }
                 Screen::Login => {
-                    let signed_in = self.config.browser.is_some();
+                    let signed_in = self.config.account.is_some();
                     self.login.on_key(key, signed_in)
                 }
             }
@@ -161,11 +161,11 @@ impl App {
                 }
             }
             Msg::Thumbnail { id, size, result } => self.thumbnails.receive(id, size, result),
-            Msg::Verified { browser, result } => match result {
+            Msg::Verified { account, result } => match result {
                 Ok(()) => {
                     // mpv was started with the old session's cookies.
                     self.player.stop();
-                    self.config.browser = Some(browser);
+                    self.config.account = Some(account);
                     self.save_config();
                     self.login.state = LoginState::Idle;
                     self.screen = Screen::Home;
@@ -267,21 +267,21 @@ impl App {
             Intent::LoadMore => self.load_more(),
             Intent::Refresh => self.load_feed(self.home.feed.clone()),
             Intent::ShowLogin => {
-                self.login = Login::new(self.config.browser);
+                self.login = Login::new(self.config.account.as_ref());
                 self.back_to = self.screen;
                 self.screen = Screen::Login;
             }
-            Intent::OpenSignIn(browser) => {
-                if let Err(err) = browser.open_sign_in() {
-                    self.status = Some(format!("cannot open {}: {err}", browser.name).into());
+            Intent::OpenSignIn(account) => {
+                if let Err(err) = account.open_sign_in() {
+                    self.status = Some(format!("cannot open {}: {err}", account.label()).into());
                 }
             }
-            Intent::Verify(browser) => {
+            Intent::Verify(account) => {
                 self.login.state = LoginState::Checking;
-                self.worker.verify(browser);
+                self.worker.verify(account);
             }
             Intent::SignOut => {
-                self.config.browser = None;
+                self.config.account = None;
                 self.save_config();
                 self.player.stop();
                 self.login = Login::new(None);
@@ -332,23 +332,28 @@ impl App {
         self.queue.retain(|queued| queued.id != card.id);
         self.played.insert(card.id.clone());
         self.play(&card.id);
-        self.worker.video(card.id.clone(), self.config.browser);
-        self.worker.comments(card.id.clone(), self.config.browser);
         self.worker
-            .related(card.id.clone(), card.title.clone(), self.config.browser);
+            .video(card.id.clone(), self.config.account.clone());
+        self.worker
+            .comments(card.id.clone(), self.config.account.clone());
+        self.worker.related(
+            card.id.clone(),
+            card.title.clone(),
+            self.config.account.clone(),
+        );
         self.watch = Some(Watch::new(card));
         self.screen = Screen::Watch;
     }
 
     fn play(&mut self, id: &str) {
-        if let Err(err) = self.player.play(id, self.config.browser) {
+        if let Err(err) = self.player.play(id, self.config.account.as_ref()) {
             self.status = Some(format!("cannot start mpv: {err}").into());
         }
     }
 
     fn load_feed(&mut self, feed: Feed) {
         self.thumbnails.clear();
-        let signed_out = feed.needs_login() && self.config.browser.is_none();
+        let signed_out = feed.needs_login() && self.config.account.is_none();
         self.home.reset(feed);
         if signed_out {
             self.home
@@ -365,7 +370,7 @@ impl App {
                 self.home.feed.clone(),
                 first,
                 home::PAGE_SIZE,
-                self.config.browser,
+                self.config.account.clone(),
             );
         }
     }

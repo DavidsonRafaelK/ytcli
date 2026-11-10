@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 use std::{env, fs, io};
 
-use crate::browser::{self, Browser};
+use crate::browser::{self, Account};
 
 /// Settings that survive restarts, stored as `key=value` lines.
 #[derive(Debug)]
 pub struct Config {
-    /// The browser whose Google session is used. `None` means signed out.
-    pub browser: Option<&'static Browser>,
+    /// The browser profile whose Google session is used. `None` means signed out.
+    pub account: Option<Account>,
     /// Whether a related video plays when one ends and the queue is empty.
     pub autoplay: bool,
 }
@@ -15,7 +15,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            browser: None,
+            account: None,
             autoplay: true,
         }
     }
@@ -27,13 +27,17 @@ impl Config {
         let Ok(text) = fs::read_to_string(config_file()) else {
             return config;
         };
+        let (mut browser, mut profile) = (None, None);
         for (key, value) in text.lines().filter_map(|line| line.split_once('=')) {
+            let value = value.trim();
             match key.trim() {
-                "browser" => config.browser = browser::find(value.trim()),
-                "autoplay" => config.autoplay = value.trim() != "off",
+                "browser" => browser = Some(value),
+                "profile" => profile = Some(value),
+                "autoplay" => config.autoplay = value != "off",
                 _ => {}
             }
         }
+        config.account = browser.and_then(|id| browser::find(id, profile));
         config
     }
 
@@ -43,8 +47,11 @@ impl Config {
             fs::create_dir_all(dir)?;
         }
         let mut body = String::new();
-        if let Some(browser) = self.browser {
-            body.push_str(&format!("browser={}\n", browser.id));
+        if let Some(account) = &self.account {
+            body.push_str(&format!("browser={}\n", account.browser.id));
+            if let Some(profile) = &account.profile {
+                body.push_str(&format!("profile={profile}\n"));
+            }
         }
         if !self.autoplay {
             body.push_str("autoplay=off\n");

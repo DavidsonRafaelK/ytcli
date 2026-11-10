@@ -43,6 +43,6 @@ fn hints(app: &App) -> &'static str {
             }
             _ => " ↑↓ move  ⏎ expand  A autoplay  p play again  / search  esc back  q quit",
         },
-        Screen::Login => " ↑↓ choose  o open sign-in page  ⏎ use browser  esc skip",
+        Screen::Login => " ↑↓ choose  o open sign-in page  ⏎ use this profile  esc skip",
     }
 }

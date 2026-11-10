@@ -1,7 +1,7 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 use super::Intent;
-use crate::browser::{self, Browser};
+use crate::browser::{self, Account};
 
 pub enum LoginState {
     Idle,
@@ -9,21 +9,21 @@ pub enum LoginState {
     Failed(Box<str>),
 }
 
-/// Picking the browser whose Google session yt borrows.
+/// Picking the browser profile whose Google session yt borrows.
 pub struct Login {
-    pub browsers: Vec<&'static Browser>,
+    pub accounts: Vec<Account>,
     pub selected: usize,
     pub state: LoginState,
 }
 
 impl Login {
-    pub fn new(current: Option<&'static Browser>) -> Self {
-        let browsers = browser::installed();
+    pub fn new(current: Option<&Account>) -> Self {
+        let accounts = browser::accounts();
         let selected = current
-            .and_then(|current| browsers.iter().position(|b| *b == current))
+            .and_then(|current| accounts.iter().position(|account| account == current))
             .unwrap_or(0);
         Self {
-            browsers,
+            accounts,
             selected,
             state: LoginState::Idle,
         }
@@ -36,10 +36,10 @@ impl Login {
         match key.code {
             KeyCode::Up | KeyCode::Char('k') => self.selected = self.selected.saturating_sub(1),
             KeyCode::Down | KeyCode::Char('j') => {
-                self.selected = (self.selected + 1).min(self.browsers.len().saturating_sub(1));
+                self.selected = (self.selected + 1).min(self.accounts.len().saturating_sub(1));
             }
-            KeyCode::Char('o') => return self.browser().map(Intent::OpenSignIn),
-            KeyCode::Enter => return self.browser().map(Intent::Verify),
+            KeyCode::Char('o') => return self.account().map(Intent::OpenSignIn),
+            KeyCode::Enter => return self.account().map(Intent::Verify),
             KeyCode::Char('x') if signed_in => return Some(Intent::SignOut),
             KeyCode::Esc => return Some(Intent::Back),
             KeyCode::Char('q') => return Some(Intent::Quit),
@@ -48,7 +48,7 @@ impl Login {
         None
     }
 
-    fn browser(&self) -> Option<&'static Browser> {
-        self.browsers.get(self.selected).copied()
+    fn account(&self) -> Option<Account> {
+        self.accounts.get(self.selected).cloned()
     }
 }

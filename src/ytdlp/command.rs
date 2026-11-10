@@ -1,15 +1,15 @@
 use std::process::{Command, Stdio};
 
-use crate::browser::Browser;
+use crate::browser::Account;
 use crate::error::{Error, Result};
 
-/// Runs yt-dlp and returns its stdout. With a browser, requests carry that browser's
-/// Google session; cookies are read fresh every time, so nothing secret is stored by us.
-pub fn run(args: &[&str], browser: Option<&Browser>) -> Result<Vec<u8>> {
+/// Runs yt-dlp and returns its stdout. With an account, requests carry its Google
+/// session; cookies are read fresh every time, so nothing secret is stored by us.
+pub fn run(args: &[&str], account: Option<&Account>) -> Result<Vec<u8>> {
     let mut command = Command::new("yt-dlp");
     command.args(["--no-warnings", "--no-progress"]);
-    if let Some(browser) = browser {
-        command.args(["--cookies-from-browser", browser.id]);
+    if let Some(account) = account {
+        command.args(["--cookies-from-browser", &account.cookie_source()]);
     }
     let output = command
         .args(args)

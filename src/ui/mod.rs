@@ -25,7 +25,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Screen::Watch => {
             watch::render(frame, areas.body, app);
         }
-        Screen::Login => login::render(frame, areas.body, &app.login, app.config.browser),
+        Screen::Login => login::render(frame, areas.body, &app.login, app.config.account.as_ref()),
     }
     footer::render(frame, areas.footer, app);
 }

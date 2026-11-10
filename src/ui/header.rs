@@ -32,8 +32,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     search_bar::render(frame, search, &app.search);
 
-    let account_line = match app.config.browser {
-        Some(browser) => Line::styled(browser.name, theme::muted()),
+    let account_line = match &app.config.account {
+        Some(account) => Line::styled(account.label(), theme::muted()),
         None => Line::styled("Sign in (L)", theme::accent().bold()),
     };
     frame.render_widget(

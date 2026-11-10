@@ -19,9 +19,9 @@ cargo install --path .
 ## Signing in
 
 yt borrows the Google session of a browser you are signed in with. On first start pick
-the browser, press `o` to open Google's sign-in page there, then `⏎`. Cookies are read
-from the browser on every request and never stored by yt. Press `L` later to switch or
-sign out.
+the browser (for Chrome, Brave, Edge, Chromium and Vivaldi: the profile), press `o` to
+open Google's sign-in page there, then `⏎`. Cookies are read from the browser on every
+request and never stored by yt. Press `L` later to switch or sign out.
 
 - Chrome, Brave, Edge: macOS asks once for Keychain access; choose "Always Allow".
 - Safari: give your terminal Full Disk Access.

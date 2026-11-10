@@ -10,7 +10,7 @@ use std::{env, fs, thread};
 
 use serde::Deserialize;
 
-use crate::browser::Browser;
+use crate::browser::Account;
 use crate::videotoolbox::{self, AV1, VP9};
 use crate::worker::Msg;
 use crate::ytdlp;
@@ -76,7 +76,7 @@ struct Mpv {
     child: Child,
     instance: u64,
     /// The session mpv was started with; another one needs a new mpv.
-    browser: Option<&'static Browser>,
+    account: Option<Account>,
     socket: PathBuf,
     /// Filled in by the listener once the socket is connected.
     ipc: Arc<Mutex<Option<UnixStream>>>,
@@ -102,9 +102,13 @@ impl Player {
         }
     }
 
-    pub fn play(&mut self, id: &str, browser: Option<&'static Browser>) -> io::Result<()> {
+    pub fn play(&mut self, id: &str, account: Option<&Account>) -> io::Result<()> {
         let url = ytdlp::watch_url(id);
-        if let Some(mpv) = self.mpv.as_mut().filter(|mpv| mpv.browser == browser) {
+        if let Some(mpv) = self
+            .mpv
+            .as_mut()
+            .filter(|mpv| mpv.account.as_ref() == account)
+        {
             // Fails while mpv is still starting or after it quit; a new one does the job.
             if mpv.load(&url).is_ok() {
                 return Ok(());
@@ -112,7 +116,7 @@ impl Player {
         }
         self.stop();
         self.instances += 1;
-        self.mpv = Some(Mpv::spawn(&url, browser, self.instances, &self.events)?);
+        self.mpv = Some(Mpv::spawn(&url, account, self.instances, &self.events)?);
         Ok(())
     }
 
@@ -159,7 +163,7 @@ impl Drop for Player {
 impl Mpv {
     fn spawn(
         url: &str,
-        browser: Option<&'static Browser>,
+        account: Option<&Account>,
         instance: u64,
         events: &Sender<Msg>,
     ) -> io::Result<Self> {
@@ -174,10 +178,10 @@ impl Mpv {
             "--ytdl-raw-options-append=format-sort={}",
             *FORMAT_SORT
         ));
-        if let Some(browser) = browser {
+        if let Some(account) = account {
             command.arg(format!(
                 "--ytdl-raw-options-append=cookies-from-browser={}",
-                browser.id
+                account.cookie_source()
             ));
         }
         let child = command
@@ -194,7 +198,7 @@ impl Mpv {
         Ok(Self {
             child,
             instance,
-            browser,
+            account: account.cloned(),
             socket,
             ipc,
             loads: 1,

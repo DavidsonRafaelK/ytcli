@@ -6,12 +6,12 @@ use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 
 use super::theme;
 use crate::app::{Login, LoginState};
-use crate::browser::Browser;
+use crate::browser::Account;
 
 const WIDTH: u16 = 72;
 
-pub fn render(frame: &mut Frame, area: Rect, login: &Login, current: Option<&Browser>) {
-    let height = u16::try_from(login.browsers.len()).unwrap_or(0) + 16;
+pub fn render(frame: &mut Frame, area: Rect, login: &Login, current: Option<&Account>) {
+    let height = u16::try_from(login.accounts.len()).unwrap_or(0) + 16;
     let [column] = Layout::horizontal([Constraint::Max(WIDTH)])
         .flex(Flex::Center)
         .areas(area);
@@ -22,15 +22,18 @@ pub fn render(frame: &mut Frame, area: Rect, login: &Login, current: Option<&Bro
     let mut lines = vec![
         Line::styled("Sign in with your Google account", theme::bold()),
         Line::default(),
-        Line::raw("yt uses the YouTube session of your browser:"),
-        Line::raw(" 1. press o and sign in to Google in the selected browser"),
-        Line::raw(" 2. come back and press ⏎ to use that browser's session"),
+        Line::raw("yt uses the YouTube session of a browser profile:"),
+        Line::raw(" 1. press o and sign in to Google in the selected profile"),
+        Line::raw(" 2. come back and press ⏎ to use that profile's session"),
         Line::default(),
     ];
-    lines.extend(login.browsers.iter().enumerate().map(|(i, browser)| {
+    lines.extend(login.accounts.iter().enumerate().map(|(i, account)| {
         let marker = if i == login.selected { "▸ " } else { "  " };
-        let mut spans = vec![Span::raw(marker), Span::raw(browser.name)];
-        if Some(*browser) == current {
+        let mut spans = vec![Span::raw(marker), Span::raw(account.label())];
+        if let Some(email) = &account.email {
+            spans.push(Span::styled(format!("  {email}"), theme::muted()));
+        }
+        if Some(account) == current {
             spans.push(Span::styled("  (signed in)", theme::muted()));
         }
         let line = Line::from(spans);

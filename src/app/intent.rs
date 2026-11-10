@@ -1,4 +1,4 @@
-use crate::browser::Browser;
+use crate::browser::Account;
 use crate::feed::Feed;
 use crate::model::VideoCard;
 
@@ -17,8 +17,8 @@ pub enum Intent {
     LoadMore,
     Refresh,
     ShowLogin,
-    OpenSignIn(&'static Browser),
-    Verify(&'static Browser),
+    OpenSignIn(Account),
+    Verify(Account),
     SignOut,
     Quit,
 }

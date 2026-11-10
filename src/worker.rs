@@ -8,7 +8,7 @@ use ratatui::layout::Size;
 use ratatui_image::picker::Picker;
 use ratatui_image::protocol::Protocol;
 
-use crate::browser::Browser;
+use crate::browser::Account;
 use crate::error::Result;
 use crate::feed::Feed;
 use crate::model::{Thread, VideoCard, VideoDetails};
@@ -42,7 +42,7 @@ pub enum Msg {
         result: Result<Protocol>,
     },
     Verified {
-        browser: &'static Browser,
+        account: Account,
         result: Result<()>,
     },
 }
@@ -96,39 +96,39 @@ impl Worker {
         feed: Feed,
         first: usize,
         count: usize,
-        browser: Option<&'static Browser>,
+        account: Option<Account>,
     ) {
         self.background(move || Msg::Feed {
             generation,
-            result: ytdlp::feed_page(&feed, first, count, browser),
+            result: ytdlp::feed_page(&feed, first, count, account.as_ref()),
         });
     }
 
-    pub fn video(&self, id: Box<str>, browser: Option<&'static Browser>) {
+    pub fn video(&self, id: Box<str>, account: Option<Account>) {
         self.background(move || {
-            let result = ytdlp::video(&id, browser);
+            let result = ytdlp::video(&id, account.as_ref());
             Msg::Video { id, result }
         });
     }
 
-    pub fn comments(&self, id: Box<str>, browser: Option<&'static Browser>) {
+    pub fn comments(&self, id: Box<str>, account: Option<Account>) {
         self.background(move || {
-            let result = ytdlp::comments(&id, browser);
+            let result = ytdlp::comments(&id, account.as_ref());
             Msg::Comments { id, result }
         });
     }
 
-    pub fn related(&self, id: Box<str>, title: Box<str>, browser: Option<&'static Browser>) {
+    pub fn related(&self, id: Box<str>, title: Box<str>, account: Option<Account>) {
         self.background(move || {
-            let result = ytdlp::related(&id, &title, browser);
+            let result = ytdlp::related(&id, &title, account.as_ref());
             Msg::Related { id, result }
         });
     }
 
-    pub fn verify(&self, browser: &'static Browser) {
+    pub fn verify(&self, account: Account) {
         self.background(move || Msg::Verified {
-            browser,
-            result: ytdlp::verify(browser),
+            result: ytdlp::verify(&account),
+            account,
         });
     }
 
